@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro de Soporte IT</title>
+    <!-- Aquí conectamos el diseño CSS -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>🖥️ Registro de Soporte</h1>
+        
+        <!-- Formulario de captura de datos -->
+        <form id="form-soporte">
+            <label for="fecha">Fecha:</label>
+            <input type="date" id="fecha" required>
+
+            <label for="usuario">Usuario atendido:</label>
+            <input type="text" id="usuario" placeholder="Ej. Juan Pérez" required>
+
+            <label for="area">Área / Departamento:</label>
+            <select id="area" required>
+                <option value="">Selecciona un área...</option>
+                <option value="Recursos Humanos">Recursos Humanos</option>
+                <option value="Contabilidad">Financiero</option>
+                <option value="Ventas">Direccion Administrativa</option>
+                <option value="Dirección">DG</option>
+                <option value="Operaciones">Juridico</option>
+                <option value="Operaciones">Planeación</option>
+                <option value="Operaciones">Recursos Materiales</option>
+                <option value="Operaciones">Infraestructura</option>
+                <option value="Operaciones">EMSAD</option>
+            </select>
+
+            <label for="descripcion">Descripción del servicio:</label>
+            <textarea id="descripcion" placeholder="Ej. Configuración de impresora..." required></textarea>
+
+            <button type="submit">Registrar Servicio</button>
+        </form>
+
+        <!-- Sección del reporte semanal -->
+        <div class="resumen">
+            <button id="btn-resumen" class="btn-secundario">📊 Ver Total de la Semana</button>
+            <p id="mensaje-resumen"></p>
+        </div>
+
+        <hr>
+
+        <!-- Tabla de historial -->
+        <h2>Historial de Servicios</h2>
+        <table id="tabla-servicios">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Usuario</th>
+                    <th>Área</th>
+                    <th>Descripción</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody id="lista-servicios">
+                <!-- Los registros guardados por JavaScript aparecerán aquí automáticamente -->
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Aquí conectamos la lógica de JavaScript -->
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+    margin: 0;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+h1, h2 { color: #2c3e50; }
+
+form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+input, select, textarea {
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-family: inherit;
+}
+
+button {
+    padding: 10px;
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+button:hover { background-color: #219150; }
+
+.btn-secundario {
+    background-color: #2980b9;
+    margin-bottom: 10px;
+}
+
+.btn-secundario:hover { background-color: #2471a3; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+th { background-color: #f2f2f2; }
+
+#mensaje-resumen {
+    font-weight: bold;
+    color: #d35400;
+}
+
+/* Estilos para los nuevos botones de acciones */
+.btn-editar {
+    background-color: #f39c12;
+    padding: 6px 10px;
+    font-size: 14px;
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+.btn-editar:hover { background-color: #e67e22; }
+
+.btn-eliminar {
+    background-color: #e74c3c;
+    padding: 6px 10px;
+    font-size: 14px;
+}
+.btn-eliminar:hover { background-color: #c0392b; }
