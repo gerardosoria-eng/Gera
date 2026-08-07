@@ -3,69 +3,270 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Registro de Soporte IT</title>
-    <!-- Aquí conectamos el diseño CSS -->
+    <title>Soporte IT — Sistema de Registro</title>
+    <meta name="description" content="Sistema de registro y seguimiento de tickets de soporte técnico IT. Gestiona áreas, usuarios y genera reportes semanales.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-        <h1>🖥️ Registro de Soporte</h1>
-        
-        <!-- Formulario de captura de datos -->
-        <form id="form-soporte">
-            <label for="fecha">Fecha:</label>
-            <input type="date" id="fecha" required>
 
-            <label for="usuario">Usuario atendido:</label>
-            <input type="text" id="usuario" placeholder="Ej. Juan Pérez" required>
+<div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+        <h1>🖥️ Soporte IT</h1>
+        <p>Sistema de registro y seguimiento</p>
+    </header>
 
-            <label for="area">Área / Departamento:</label>
-            <select id="area" required>
-                <option value="">Selecciona un área...</option>
-                <option value="Recursos Humanos">Recursos Humanos</option>
-                <option value="Contabilidad">Financiero</option>
-                <option value="Ventas">Direccion Administrativa</option>
-                <option value="Dirección">DG</option>
-                <option value="Operaciones">Juridico</option>
-                <option value="Operaciones">Planeación</option>
-                <option value="Operaciones">Recursos Materiales</option>
-                <option value="Operaciones">Infraestructura</option>
-                <option value="Operaciones">EMSAD</option>
-            </select>
+    <!-- Tab Navigation -->
+    <nav class="tab-nav" id="tab-nav">
+        <button class="tab-btn active" data-tab="tickets" id="tab-btn-tickets">
+            <span>📋</span>
+            <span class="tab-label">Tickets</span>
+            <span class="badge" id="badge-tickets">0</span>
+        </button>
+        <button class="tab-btn" data-tab="usuarios" id="tab-btn-usuarios">
+            <span>👥</span>
+            <span class="tab-label">Usuarios</span>
+            <span class="badge" id="badge-usuarios">0</span>
+        </button>
+        <button class="tab-btn" data-tab="areas" id="tab-btn-areas">
+            <span>🏢</span>
+            <span class="tab-label">Áreas</span>
+            <span class="badge" id="badge-areas">0</span>
+        </button>
+    </nav>
 
-            <label for="descripcion">Descripción del servicio:</label>
-            <textarea id="descripcion" placeholder="Ej. Configuración de impresora..." required></textarea>
+    <!-- =========================================
+         TAB: TICKETS
+         ========================================= -->
+    <section class="tab-panel active" id="panel-tickets">
 
-            <button type="submit">Registrar Servicio</button>
-        </form>
-
-        <!-- Sección del reporte semanal -->
-        <div class="resumen">
-            <button id="btn-resumen" class="btn-secundario">📊 Ver Total de la Semana</button>
-            <p id="mensaje-resumen"></p>
+        <!-- Stats -->
+        <div class="stats-bar" id="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Esta semana</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-open">0</div>
+                <div class="stat-label">Abiertos</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="stat-closed">0</div>
+                <div class="stat-label">Cerrados</div>
+            </div>
         </div>
 
-        <hr>
+        <!-- PDF Report -->
+        <div class="pdf-section">
+            <div class="week-label" id="week-label"></div>
+            <button class="btn btn-secondary btn-sm" id="btn-pdf" type="button">
+                📄 Generar Reporte PDF
+            </button>
+        </div>
 
-        <!-- Tabla de historial -->
-        <h2>Historial de Servicios</h2>
-        <table id="tabla-servicios">
-            <thead>
-                <tr>
-                    <th>Fecha</th>
-                    <th>Usuario</th>
-                    <th>Área</th>
-                    <th>Descripción</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody id="lista-servicios">
-                <!-- Los registros guardados por JavaScript aparecerán aquí automáticamente -->
-            </tbody>
-        </table>
+        <!-- Ticket Form -->
+        <div class="card" id="card-ticket-form">
+            <h2 class="card-title">
+                <span class="icon">✏️</span>
+                <span id="ticket-form-title">Nuevo Ticket</span>
+            </h2>
+            <form id="form-ticket">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ticket-fecha">Fecha</label>
+                        <input type="date" id="ticket-fecha" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="ticket-usuario">Usuario atendido</label>
+                        <select id="ticket-usuario" required>
+                            <option value="">Seleccionar usuario...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="ticket-status">Estado</label>
+                        <select id="ticket-status" required>
+                            <option value="abierto">Abierto</option>
+                            <option value="en_progreso">En progreso</option>
+                            <option value="cerrado">Cerrado</option>
+                        </select>
+                    </div>
+                    <div class="form-group">&nbsp;</div>
+                </div>
+                <div class="form-group">
+                    <label for="ticket-problema">Problema</label>
+                    <textarea id="ticket-problema" placeholder="Describe el problema reportado..." required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="ticket-dx">Diagnóstico</label>
+                    <textarea id="ticket-dx" placeholder="Tu diagnóstico del problema (opcional)..." rows="2"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="ticket-solucion">Solución</label>
+                    <textarea id="ticket-solucion" placeholder="Cómo se resolvió (opcional)..." rows="2"></textarea>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary btn-block" id="btn-ticket-submit">
+                        Registrar Ticket
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-ticket-cancel" style="display:none;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Tickets Table -->
+        <div class="card">
+            <h2 class="card-title">
+                <span class="icon">📋</span>
+                Historial de Tickets
+            </h2>
+            <div id="tickets-loading" class="loading-overlay">
+                <div class="spinner"></div>
+                Cargando tickets...
+            </div>
+            <div class="table-wrapper" id="tickets-table-wrapper" style="display:none;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Usuario</th>
+                            <th>Área</th>
+                            <th>Problema</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tickets-tbody"></tbody>
+                </table>
+            </div>
+            <div id="tickets-empty" class="empty-state" style="display:none;">
+                <span class="icon">📭</span>
+                <p>No hay tickets registrados aún</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         TAB: USUARIOS
+         ========================================= -->
+    <section class="tab-panel" id="panel-usuarios">
+        <!-- User Form -->
+        <div class="card">
+            <h2 class="card-title">
+                <span class="icon">➕</span>
+                <span id="usuario-form-title">Agregar Usuario</span>
+            </h2>
+            <form id="form-usuario">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="usuario-nombre">Nombre completo</label>
+                        <input type="text" id="usuario-nombre" placeholder="Ej. Juan Pérez" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="usuario-area">Área</label>
+                        <select id="usuario-area" required>
+                            <option value="">Seleccionar área...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="btn-usuario-submit">
+                        Agregar Usuario
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-usuario-cancel" style="display:none;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Users List -->
+        <div class="card">
+            <h2 class="card-title">
+                <span class="icon">👥</span>
+                Usuarios Registrados
+            </h2>
+            <div id="usuarios-loading" class="loading-overlay">
+                <div class="spinner"></div>
+                Cargando usuarios...
+            </div>
+            <div class="list-container" id="usuarios-list" style="display:none;"></div>
+            <div id="usuarios-empty" class="empty-state" style="display:none;">
+                <span class="icon">👤</span>
+                <p>No hay usuarios registrados. Agrega el primero.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================
+         TAB: ÁREAS
+         ========================================= -->
+    <section class="tab-panel" id="panel-areas">
+        <!-- Area Form -->
+        <div class="card">
+            <h2 class="card-title">
+                <span class="icon">➕</span>
+                <span id="area-form-title">Agregar Área</span>
+            </h2>
+            <form id="form-area">
+                <div class="form-group">
+                    <label for="area-nombre">Nombre del área / departamento</label>
+                    <input type="text" id="area-nombre" placeholder="Ej. Recursos Humanos" required>
+                </div>
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="btn-area-submit">
+                        Agregar Área
+                    </button>
+                    <button type="button" class="btn btn-secondary" id="btn-area-cancel" style="display:none;">
+                        Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Areas List -->
+        <div class="card">
+            <h2 class="card-title">
+                <span class="icon">🏢</span>
+                Áreas Registradas
+            </h2>
+            <div id="areas-loading" class="loading-overlay">
+                <div class="spinner"></div>
+                Cargando áreas...
+            </div>
+            <div class="list-container" id="areas-list" style="display:none;"></div>
+            <div id="areas-empty" class="empty-state" style="display:none;">
+                <span class="icon">🏗️</span>
+                <p>No hay áreas registradas. Agrega la primera.</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+<!-- Ticket detail modal -->
+<div class="modal-overlay" id="modal-ticket-detail">
+    <div class="modal">
+        <div class="modal-header">
+            <h3>Detalle del Ticket</h3>
+            <button class="modal-close" id="modal-close-detail" type="button">&times;</button>
+        </div>
+        <div id="modal-detail-body"></div>
     </div>
+</div>
 
-    <!-- Aquí conectamos la lógica de JavaScript -->
-    <script src="app.js"></script>
+<!-- jsPDF for client-side PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
+
+<!-- App scripts -->
+<script src="supabase.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
