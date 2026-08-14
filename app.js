@@ -81,10 +81,18 @@ const modalDetailBody = $('#modal-detail-body');
 // Toast
 const toastContainer = $('#toast-container');
 
+// Theme Toggle
+const themeToggle = $('#theme-toggle');
+const themeIcon = $('#theme-icon');
+const themeLabel = $('#theme-label');
+
 // ============================================
 // Init
 // ============================================
 (async function init() {
+  // Initialize theme from localStorage
+  initTheme();
+
   // Set default date to today
   ticketFecha.value = new Date().toISOString().split('T')[0];
   updateWeekLabel();
@@ -93,6 +101,7 @@ const toastContainer = $('#toast-container');
   setupTabs();
   setupForms();
   setupModal();
+  setupThemeToggle();
 
   // Load all data
   await Promise.all([loadAreas(), loadUsuarios(), loadTickets()]);
@@ -699,4 +708,33 @@ function setupForms() {
   setupUsuarioForm();
   setupTicketForm();
   setupPdf();
+}
+
+// ============================================
+// Theme Toggle (Dark / Light)
+// ============================================
+function initTheme() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  applyTheme(saved);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  if (theme === 'light') {
+    themeIcon.textContent = '☀️';
+    themeLabel.textContent = 'Claro';
+  } else {
+    themeIcon.textContent = '🌙';
+    themeLabel.textContent = 'Oscuro';
+  }
+}
+
+function setupThemeToggle() {
+  themeToggle.addEventListener('click', () => {
+    const current = document.documentElement.getAttribute('data-theme') || 'dark';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    localStorage.setItem('theme', next);
+    showToast(`Tema ${next === 'dark' ? 'oscuro' : 'claro'} activado`);
+  });
 }

@@ -57,3 +57,34 @@ ALTER TABLE tickets DROP COLUMN IF EXISTS descripcion;
 
 -- 4. Hacer problema NOT NULL ahora que migramos datos
 ALTER TABLE tickets ALTER COLUMN problema SET NOT NULL;
+
+
+-- ============================================
+-- CATÁLOGO DE DEPARTAMENTOS (Áreas)
+-- INSERT masivo para poblar la tabla "areas"
+-- Ejecutar en Supabase SQL Editor
+-- ============================================
+-- Usa ON CONFLICT para evitar duplicados si ya existen
+
+INSERT INTO areas (nombre) VALUES
+  ('Dir. de Vinculación'),
+  ('Depto. de Promoción Cultural, Cívica y Deportiva'),
+  ('Dir. EMSAD'),
+  ('Depto. Desarrollo Académico'),
+  ('Depto. de Operación y Evaluación'),
+  ('Dir. Académica'),
+  ('Depto. de Planes y Programas'),
+  ('Depto. de Servicios Docentes'),
+  ('Dir. de Planeación'),
+  ('Subdirección de Programación y Presupuesto'),
+  ('Depto. de Infraestructura Educativa'),
+  ('Depto. Jurídico'),
+  ('Dir. Administrativa'),
+  ('Depto. de Recursos Humanos'),
+  ('Depto. de Recursos Financieros'),
+  ('Depto. de Recursos Materiales y Servicios'),
+  ('Depto. de Ingreso y Formación de Personal'),
+  ('Depto. de Registro Escolar y Estadística'),
+  ('Junta Directiva'),
+  ('Dir. General')
+ON CONFLICT (nombre) DO NOTHING;
