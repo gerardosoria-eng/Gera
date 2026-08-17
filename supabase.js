@@ -7,52 +7,62 @@ let SUPABASE_URL = '__SUPABASE_URL__';
 let SUPABASE_KEY = '__SUPABASE_KEY__';
 
 // Fallback para desarrollo local si no se ha ejecutado el build script
-if (SUPABASE_URL.startsWith('__') || !SUPABASE_URL) {
+if (!SUPABASE_URL || SUPABASE_URL.startsWith('__')) {
   SUPABASE_URL = 'https://mdrqiajschjdxntltdmt.supabase.co';
 }
-if (SUPABASE_KEY.startsWith('__') || !SUPABASE_KEY) {
+if (!SUPABASE_KEY || SUPABASE_KEY.startsWith('__')) {
   SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kcnFpYWpzY2hqZHhudGx0ZG10Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMTQxMDQsImV4cCI6MjEwMTY5MDEwNH0.0tmJdaX68yvZdNLSHEzWqFcepwzEbm3K2wOfFw8-0yY';
 }
 
-// Initialize the Supabase client (SDK loaded via CDN in index.html)
-const supabase = (typeof window !== 'undefined' && window.supabase)
-  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
-  : null;
+// Inicializar cliente de Supabase
+let supabaseClient = null;
+try {
+  if (typeof window !== 'undefined' && window.supabase && typeof window.supabase.createClient === 'function') {
+    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  }
+} catch (e) {
+  console.error('Error inicializando Supabase Client:', e);
+}
 
 // ============================================
 // Authentication (M2)
 // ============================================
 
 async function signIn(email, password) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  const client = supabaseClient || (window.supabase && window.supabase.auth ? window.supabase : null);
+  if (!client) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw error;
   return data;
 }
 
 async function signUp(email, password) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase.auth.signUp({ email, password });
+  const client = supabaseClient || (window.supabase && window.supabase.auth ? window.supabase : null);
+  if (!client) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await client.auth.signUp({ email, password });
   if (error) throw error;
   return data;
 }
 
 async function signOut() {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { error } = await supabase.auth.signOut();
+  const client = supabaseClient || (window.supabase && window.supabase.auth ? window.supabase : null);
+  if (!client) throw new Error('Cliente Supabase no inicializado');
+  const { error } = await client.auth.signOut();
   if (error) throw error;
 }
 
 async function getSession() {
-  if (!supabase) return null;
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const client = supabaseClient || (window.supabase && window.supabase.auth ? window.supabase : null);
+  if (!client) return null;
+  const { data: { session }, error } = await client.auth.getSession();
   if (error) throw error;
   return session;
 }
 
 async function getProfile(userId) {
-  if (!supabase) return null;
-  const { data, error } = await supabase
+  const client = supabaseClient;
+  if (!client) return null;
+  const { data, error } = await client
     .from('perfiles')
     .select('*, areas(nombre)')
     .eq('id', userId)
@@ -62,8 +72,9 @@ async function getProfile(userId) {
 }
 
 function onAuthStateChange(callback) {
-  if (!supabase) return { data: { subscription: { unsubscribe: () => {} } } };
-  return supabase.auth.onAuthStateChange((event, session) => {
+  const client = supabaseClient || (window.supabase && window.supabase.auth ? window.supabase : null);
+  if (!client) return { data: { subscription: { unsubscribe: () => {} } } };
+  return client.auth.onAuthStateChange((event, session) => {
     callback(event, session);
   });
 }
@@ -73,8 +84,8 @@ function onAuthStateChange(callback) {
 // ============================================
 
 async function fetchPerfiles() {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('perfiles')
     .select('*, areas(nombre)')
     .order('created_at', { ascending: false });
@@ -83,8 +94,8 @@ async function fetchPerfiles() {
 }
 
 async function updatePerfil(id, updates) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('perfiles')
     .update(updates)
     .eq('id', id)
@@ -99,8 +110,8 @@ async function updatePerfil(id, updates) {
 // ============================================
 
 async function fetchAreas() {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('areas')
     .select('*')
     .order('nombre', { ascending: true });
@@ -109,8 +120,8 @@ async function fetchAreas() {
 }
 
 async function createArea(nombre, descripcion = null) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('areas')
     .insert({ nombre, descripcion })
     .select()
@@ -120,10 +131,10 @@ async function createArea(nombre, descripcion = null) {
 }
 
 async function updateArea(id, nombre, descripcion = null) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const body = { nombre };
   if (descripcion !== null) body.descripcion = descripcion;
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('areas')
     .update(body)
     .eq('id', id)
@@ -134,8 +145,8 @@ async function updateArea(id, nombre, descripcion = null) {
 }
 
 async function deleteArea(id) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { error } = await supabaseClient
     .from('areas')
     .delete()
     .eq('id', id);
@@ -147,8 +158,8 @@ async function deleteArea(id) {
 // ============================================
 
 async function fetchUsuarios() {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('usuarios')
     .select('*, areas(nombre)')
     .order('nombre', { ascending: true });
@@ -157,12 +168,12 @@ async function fetchUsuarios() {
 }
 
 async function createUsuario(nombre, area_id, email = null, telefono = null) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const body = { nombre, area_id };
   if (email) body.email = email;
   if (telefono) body.telefono = telefono;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('usuarios')
     .insert(body)
     .select()
@@ -172,12 +183,12 @@ async function createUsuario(nombre, area_id, email = null, telefono = null) {
 }
 
 async function updateUsuario(id, nombre, area_id, email = null, telefono = null) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const body = { nombre, area_id };
   if (email !== null) body.email = email;
   if (telefono !== null) body.telefono = telefono;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('usuarios')
     .update(body)
     .eq('id', id)
@@ -188,8 +199,8 @@ async function updateUsuario(id, nombre, area_id, email = null, telefono = null)
 }
 
 async function deleteUsuario(id) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { error } = await supabaseClient
     .from('usuarios')
     .delete()
     .eq('id', id);
@@ -201,8 +212,8 @@ async function deleteUsuario(id) {
 // ============================================
 
 async function fetchTickets() {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('tickets')
     .select('*, usuarios(nombre, areas(nombre))')
     .order('fecha', { ascending: false })
@@ -212,7 +223,7 @@ async function fetchTickets() {
 }
 
 async function createTicket({ usuario_id, problema, dx, solucion, fecha, status, prioridad = 'media' }) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const body = {
     usuario_id,
     problema,
@@ -223,7 +234,7 @@ async function createTicket({ usuario_id, problema, dx, solucion, fecha, status,
   if (solucion) body.solucion = solucion;
   if (status) body.status = status;
 
-  const { data, error } = await supabase
+  const { data, error } = await supabaseClient
     .from('tickets')
     .insert(body)
     .select()
@@ -233,8 +244,8 @@ async function createTicket({ usuario_id, problema, dx, solucion, fecha, status,
 }
 
 async function updateTicket(id, updates) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { data, error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
     .from('tickets')
     .update(updates)
     .eq('id', id)
@@ -245,8 +256,8 @@ async function updateTicket(id, updates) {
 }
 
 async function deleteTicket(id) {
-  if (!supabase) throw new Error('Cliente Supabase no inicializado');
-  const { error } = await supabase
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { error } = await supabaseClient
     .from('tickets')
     .delete()
     .eq('id', id);
@@ -258,8 +269,8 @@ async function deleteTicket(id) {
 // ============================================
 
 async function fetchCategorias() {
-  if (!supabase) return [];
-  const { data, error } = await supabase
+  if (!supabaseClient) return [];
+  const { data, error } = await supabaseClient
     .from('categorias')
     .select('*')
     .eq('activo', true)
@@ -269,4 +280,32 @@ async function fetchCategorias() {
     return [];
   }
   return data || [];
+}
+
+// ============================================
+// Exportar explícitamente a window
+// ============================================
+if (typeof window !== 'undefined') {
+  window.supabaseClient = supabaseClient;
+  window.signIn = signIn;
+  window.signUp = signUp;
+  window.signOut = signOut;
+  window.getSession = getSession;
+  window.getProfile = getProfile;
+  window.onAuthStateChange = onAuthStateChange;
+  window.fetchPerfiles = fetchPerfiles;
+  window.updatePerfil = updatePerfil;
+  window.fetchAreas = fetchAreas;
+  window.createArea = createArea;
+  window.updateArea = updateArea;
+  window.deleteArea = deleteArea;
+  window.fetchUsuarios = fetchUsuarios;
+  window.createUsuario = createUsuario;
+  window.updateUsuario = updateUsuario;
+  window.deleteUsuario = deleteUsuario;
+  window.fetchTickets = fetchTickets;
+  window.createTicket = createTicket;
+  window.updateTicket = updateTicket;
+  window.deleteTicket = deleteTicket;
+  window.fetchCategorias = fetchCategorias;
 }

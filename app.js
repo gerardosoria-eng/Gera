@@ -177,8 +177,58 @@ const themeLabel = $('#theme-label');
 })();
 
 // ============================================
-// Auth Handlers (M2)
+// Auth Helpers & Handlers (M2)
 // ============================================
+async function executeSignUp(email, password) {
+  if (typeof window.signUp === 'function') {
+    return await window.signUp(email, password);
+  }
+  if (window.supabaseClient && window.supabaseClient.auth) {
+    const { data, error } = await window.supabaseClient.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+  }
+  if (window.supabase && window.supabase.auth) {
+    const { data, error } = await window.supabase.auth.signUp({ email, password });
+    if (error) throw error;
+    return data;
+  }
+  throw new Error('El servicio de autenticación no está listo. Recarga la página.');
+}
+
+async function executeSignIn(email, password) {
+  if (typeof window.signIn === 'function') {
+    return await window.signIn(email, password);
+  }
+  if (window.supabaseClient && window.supabaseClient.auth) {
+    const { data, error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  }
+  if (window.supabase && window.supabase.auth) {
+    const { data, error } = await window.supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
+  }
+  throw new Error('El servicio de autenticación no está listo. Recarga la página.');
+}
+
+async function executeSignOut() {
+  if (typeof window.signOut === 'function') {
+    return await window.signOut();
+  }
+  if (window.supabaseClient && window.supabaseClient.auth) {
+    const { error } = await window.supabaseClient.auth.signOut();
+    if (error) throw error;
+    return;
+  }
+  if (window.supabase && window.supabase.auth) {
+    const { error } = await window.supabase.auth.signOut();
+    if (error) throw error;
+    return;
+  }
+}
+
 function setupAuthEvents() {
   // Toggle between Login and Register
   btnShowRegister.addEventListener('click', () => {
@@ -209,7 +259,7 @@ function setupAuthEvents() {
     setLoginLoading(true);
 
     try {
-      const data = await signIn(email, password);
+      const data = await executeSignIn(email, password);
       if (data && data.user) {
         showToast('¡Sesión iniciada correctamente!');
         await handleAuthenticated(data.user);
@@ -247,13 +297,12 @@ function setupAuthEvents() {
     setRegisterLoading(true);
 
     try {
-      const data = await signUp(email, password);
+      const data = await executeSignUp(email, password);
       showToast('¡Cuenta creada con éxito!');
 
       if (data && data.session && data.session.user) {
         await handleAuthenticated(data.session.user);
       } else {
-        // Requires email verification or manual login
         showToast('Registro exitoso. Ya puedes iniciar sesión.', 'success');
         formRegister.reset();
         formRegister.style.display = 'none';
@@ -274,7 +323,7 @@ function setupAuthEvents() {
   // Handle Logout
   btnLogout.addEventListener('click', async () => {
     try {
-      await signOut();
+      await executeSignOut();
       showToast('Sesión cerrada');
       handleUnauthenticated();
     } catch (err) {

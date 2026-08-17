@@ -198,6 +198,7 @@ stateDiagram-v2
 ```
 sistema-soporte/
 ├── AGENTS.md               # [ESTE ARCHIVO] Especificación maestra y directivas del agente
+├── DOCUMENTACION_SISTEMA.md# Registro de versiones y especificación funcional del sistema
 ├── index.html              # Frontend: Estructura HTML semántica, login, tabs, modales y tablas
 ├── style.css               # Estilos: Variables CSS, tema claro/oscuro, glassmorphism, responsive
 ├── app.js                  # Lógica del cliente: Eventos UI, CRUD, estados, toasts, exportación PDF
