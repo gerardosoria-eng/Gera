@@ -1,110 +1,171 @@
 // ============================================
-// Supabase REST API Client
+// Supabase Client (SDK v2)
 // Placeholders are replaced at build time
 // ============================================
 
 const SUPABASE_URL = '__SUPABASE_URL__';
 const SUPABASE_KEY = '__SUPABASE_KEY__';
 
-/**
- * Generic Supabase REST helper
- * @param {string} table - Table name
- * @param {object} options - { method, body, query }
- */
-async function supabaseRequest(table, { method = 'GET', body = null, query = '', headers = {} } = {}) {
-  const url = `${SUPABASE_URL}/rest/v1/${table}${query}`;
+// Initialize the Supabase client (SDK loaded via CDN in index.html)
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  const defaultHeaders = {
-    apikey: SUPABASE_KEY,
-    Authorization: `Bearer ${SUPABASE_KEY}`,
-    'Content-Type': 'application/json',
-    Prefer: method === 'POST' ? 'return=representation' : 'return=representation',
-  };
+// ============================================
+// Authentication
+// ============================================
 
-  const response = await fetch(url, {
-    method,
-    headers: { ...defaultHeaders, ...headers },
-    body: body ? JSON.stringify(body) : null,
+async function signIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) throw error;
+  return data;
+}
+
+async function signUp(email, password) {
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) throw error;
+  return data;
+}
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut();
+  if (error) throw error;
+}
+
+async function getSession() {
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  return session;
+}
+
+async function getProfile(userId) {
+  const { data, error } = await supabase
+    .from('perfiles')
+    .select('*, areas(nombre)')
+    .eq('id', userId)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+function onAuthStateChange(callback) {
+  return supabase.auth.onAuthStateChange((event, session) => {
+    callback(event, session);
   });
+}
 
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`Supabase error (${response.status}): ${error}`);
-  }
+// ============================================
+// Perfiles (Admin only — RLS enforces this)
+// ============================================
 
-  // DELETE and some PATCHes may return empty body
-  const text = await response.text();
-  return text ? JSON.parse(text) : null;
+async function fetchPerfiles() {
+  const { data, error } = await supabase
+    .from('perfiles')
+    .select('*, areas(nombre)')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+async function updatePerfil(id, updates) {
+  const { data, error } = await supabase
+    .from('perfiles')
+    .update(updates)
+    .eq('id', id)
+    .select('*, areas(nombre)')
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 // ---- AREAS ----
 
 async function fetchAreas() {
-  return supabaseRequest('areas', { query: '?select=*&order=nombre.asc' });
+  const { data, error } = await supabase
+    .from('areas')
+    .select('*')
+    .order('nombre', { ascending: true });
+  if (error) throw error;
+  return data;
 }
 
 async function createArea(nombre) {
-  const result = await supabaseRequest('areas', {
-    method: 'POST',
-    body: { nombre },
-  });
-  return result[0];
+  const { data, error } = await supabase
+    .from('areas')
+    .insert({ nombre })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function updateArea(id, nombre) {
-  const result = await supabaseRequest('areas', {
-    method: 'PATCH',
-    body: { nombre },
-    query: `?id=eq.${id}`,
-  });
-  return result[0];
+  const { data, error } = await supabase
+    .from('areas')
+    .update({ nombre })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function deleteArea(id) {
-  return supabaseRequest('areas', {
-    method: 'DELETE',
-    query: `?id=eq.${id}`,
-  });
+  const { error } = await supabase
+    .from('areas')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ---- USUARIOS ----
 
 async function fetchUsuarios() {
-  return supabaseRequest('usuarios', {
-    query: '?select=*,areas(nombre)&order=nombre.asc',
-  });
+  const { data, error } = await supabase
+    .from('usuarios')
+    .select('*, areas(nombre)')
+    .order('nombre', { ascending: true });
+  if (error) throw error;
+  return data;
 }
 
 async function createUsuario(nombre, area_id) {
-  const result = await supabaseRequest('usuarios', {
-    method: 'POST',
-    body: { nombre, area_id },
-  });
-  return result[0];
+  const { data, error } = await supabase
+    .from('usuarios')
+    .insert({ nombre, area_id })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function updateUsuario(id, nombre, area_id) {
-  const result = await supabaseRequest('usuarios', {
-    method: 'PATCH',
-    body: { nombre, area_id },
-    query: `?id=eq.${id}`,
-  });
-  return result[0];
+  const { data, error } = await supabase
+    .from('usuarios')
+    .update({ nombre, area_id })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function deleteUsuario(id) {
-  return supabaseRequest('usuarios', {
-    method: 'DELETE',
-    query: `?id=eq.${id}`,
-  });
+  const { error } = await supabase
+    .from('usuarios')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
 
 // ---- TICKETS ----
 
 async function fetchTickets() {
-  return supabaseRequest('tickets', {
-    query: '?select=*,usuarios(nombre,areas(nombre))&order=fecha.desc,created_at.desc',
-  });
+  const { data, error } = await supabase
+    .from('tickets')
+    .select('*, usuarios(nombre, areas(nombre))')
+    .order('fecha', { ascending: false })
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data;
 }
 
 async function createTicket({ usuario_id, problema, dx, solucion, fecha, status }) {
@@ -113,25 +174,30 @@ async function createTicket({ usuario_id, problema, dx, solucion, fecha, status 
   if (solucion) body.solucion = solucion;
   if (status) body.status = status;
 
-  const result = await supabaseRequest('tickets', {
-    method: 'POST',
-    body,
-  });
-  return result[0];
+  const { data, error } = await supabase
+    .from('tickets')
+    .insert(body)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
-async function updateTicket(id, data) {
-  const result = await supabaseRequest('tickets', {
-    method: 'PATCH',
-    body: data,
-    query: `?id=eq.${id}`,
-  });
-  return result[0];
+async function updateTicket(id, updates) {
+  const { data, error } = await supabase
+    .from('tickets')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
 }
 
 async function deleteTicket(id) {
-  return supabaseRequest('tickets', {
-    method: 'DELETE',
-    query: `?id=eq.${id}`,
-  });
+  const { error } = await supabase
+    .from('tickets')
+    .delete()
+    .eq('id', id);
+  if (error) throw error;
 }
