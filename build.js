@@ -24,15 +24,29 @@ FILES.forEach((file) => {
 
   // Replace env placeholders in supabase.js
   if (file === 'supabase.js') {
-    const url = process.env.SUPABASE_URL || '';
-    const key = process.env.SUPABASE_KEY || '';
+    let url = process.env.SUPABASE_URL || '';
+    let key = process.env.SUPABASE_KEY || '';
 
-    if (!url || !key) {
-      console.warn('⚠️  SUPABASE_URL or SUPABASE_KEY not set. App will not connect to Supabase.');
+    // Si no están en process.env, intentar leer de .env local
+    const envPath = path.join(__dirname, '.env');
+    if ((!url || !key) && fs.existsSync(envPath)) {
+      const envContent = fs.readFileSync(envPath, 'utf-8');
+      envContent.split(/\r?\n/).forEach((line) => {
+        const [k, ...v] = line.split('=');
+        if (k && v.length > 0) {
+          const val = v.join('=').trim();
+          if (k.trim() === 'SUPABASE_URL' && !url) url = val;
+          if (k.trim() === 'SUPABASE_KEY' && !key) key = val;
+        }
+      });
     }
 
-    content = content.replace('__SUPABASE_URL__', url.trim());
-    content = content.replace('__SUPABASE_KEY__', key.trim());
+    if (!url || !key) {
+      console.warn('⚠️  SUPABASE_URL or SUPABASE_KEY not set. Using client fallback defaults.');
+    }
+
+    if (url) content = content.replace('__SUPABASE_URL__', url.trim());
+    if (key) content = content.replace('__SUPABASE_KEY__', key.trim());
 
     console.log('✅ Supabase credentials injected into supabase.js');
   }

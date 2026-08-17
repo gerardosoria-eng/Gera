@@ -1,9 +1,15 @@
 // ============================================
-// App State
+// SISTEMA DE TICKETS DE SOPORTE IT - APP CONTROLLER
 // ============================================
+
+// State
+let currentUser = null;
+let currentProfile = null;
+
 let areas = [];
 let usuarios = [];
 let tickets = [];
+let perfiles = [];
 
 let editingTicketId = null;
 let editingUsuarioId = null;
@@ -14,6 +20,37 @@ let editingAreaId = null;
 // ============================================
 const $ = (sel) => document.querySelector(sel);
 const $$ = (sel) => document.querySelectorAll(sel);
+
+// Screens
+const loginScreen = $('#login-screen');
+const appContainer = $('#app-container');
+
+// Auth Form Elements
+const formLogin = $('#form-login');
+const loginEmail = $('#login-email');
+const loginPassword = $('#login-password');
+const loginError = $('#login-error');
+const btnLogin = $('#btn-login');
+const btnLoginText = $('#btn-login-text');
+const btnLoginSpinner = $('#btn-login-spinner');
+
+const loginDivider = $('.login-divider');
+const btnShowRegister = $('#btn-show-register');
+
+const formRegister = $('#form-register');
+const registerEmail = $('#register-email');
+const registerPassword = $('#register-password');
+const registerPasswordConfirm = $('#register-password-confirm');
+const registerError = $('#register-error');
+const btnRegister = $('#btn-register');
+const btnRegisterText = $('#btn-register-text');
+const btnRegisterSpinner = $('#btn-register-spinner');
+const btnBackLogin = $('#btn-back-login');
+
+// Header & Session
+const sessionEmail = $('#session-email');
+const sessionRoleBadge = $('#session-role-badge');
+const btnLogout = $('#btn-logout');
 
 // Tabs
 const tabNav = $('#tab-nav');
@@ -68,12 +105,26 @@ const areasList = $('#areas-list');
 const areasLoading = $('#areas-loading');
 const areasEmpty = $('#areas-empty');
 
+// Admin panel
+const adminTbody = $('#admin-tbody');
+const adminLoading = $('#admin-loading');
+const adminTableWrapper = $('#admin-table-wrapper');
+const adminEmpty = $('#admin-empty');
+const modalAdminEdit = $('#modal-admin-edit');
+const modalCloseAdmin = $('#modal-close-admin');
+const formAdminEdit = $('#form-admin-edit');
+const adminEditEmail = $('#admin-edit-email');
+const adminEditRol = $('#admin-edit-rol');
+const adminEditArea = $('#admin-edit-area');
+const adminEditId = $('#admin-edit-id');
+const btnAdminEditCancel = $('#btn-admin-edit-cancel');
+
 // Badges
 const badgeTickets = $('#badge-tickets');
 const badgeUsuarios = $('#badge-usuarios');
 const badgeAreas = $('#badge-areas');
 
-// Modal
+// Modal ticket
 const modalOverlay = $('#modal-ticket-detail');
 const modalCloseDetail = $('#modal-close-detail');
 const modalDetailBody = $('#modal-detail-body');
@@ -87,25 +138,222 @@ const themeIcon = $('#theme-icon');
 const themeLabel = $('#theme-label');
 
 // ============================================
-// Init
+// Initialization & Auth Flow
 // ============================================
 (async function init() {
-  // Initialize theme from localStorage
   initTheme();
-
-  // Set default date to today
   ticketFecha.value = new Date().toISOString().split('T')[0];
   updateWeekLabel();
 
-  // Setup event listeners
+  // Setup UI event listeners
+  setupAuthEvents();
   setupTabs();
   setupForms();
   setupModal();
+  setupAdminModal();
   setupThemeToggle();
 
-  // Load all data
-  await Promise.all([loadAreas(), loadUsuarios(), loadTickets()]);
+  // Monitor auth state changes
+  onAuthStateChange(async (event, session) => {
+    if (session && session.user) {
+      await handleAuthenticated(session.user);
+    } else {
+      handleUnauthenticated();
+    }
+  });
+
+  // Check initial session
+  try {
+    const session = await getSession();
+    if (session && session.user) {
+      await handleAuthenticated(session.user);
+    } else {
+      handleUnauthenticated();
+    }
+  } catch (err) {
+    console.warn('No active session or error checking session:', err);
+    handleUnauthenticated();
+  }
 })();
+
+// ============================================
+// Auth Handlers (M2)
+// ============================================
+function setupAuthEvents() {
+  // Toggle between Login and Register
+  btnShowRegister.addEventListener('click', () => {
+    formLogin.style.display = 'none';
+    loginDivider.style.display = 'none';
+    btnShowRegister.style.display = 'none';
+    formRegister.style.display = 'block';
+    hideErrors();
+  });
+
+  btnBackLogin.addEventListener('click', () => {
+    formRegister.style.display = 'none';
+    formLogin.style.display = 'block';
+    loginDivider.style.display = 'block';
+    btnShowRegister.style.display = 'block';
+    hideErrors();
+  });
+
+  // Handle Login submission
+  formLogin.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideErrors();
+
+    const email = loginEmail.value.trim();
+    const password = loginPassword.value;
+    if (!email || !password) return;
+
+    setLoginLoading(true);
+
+    try {
+      const data = await signIn(email, password);
+      if (data && data.user) {
+        showToast('¡Sesión iniciada correctamente!');
+        await handleAuthenticated(data.user);
+      }
+    } catch (err) {
+      console.error('Login error:', err);
+      loginError.textContent = formatAuthError(err.message);
+      loginError.style.display = 'block';
+    } finally {
+      setLoginLoading(false);
+    }
+  });
+
+  // Handle Register submission
+  formRegister.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    hideErrors();
+
+    const email = registerEmail.value.trim();
+    const password = registerPassword.value;
+    const confirmPassword = registerPasswordConfirm.value;
+
+    if (password !== confirmPassword) {
+      registerError.textContent = 'Las contraseñas no coinciden.';
+      registerError.style.display = 'block';
+      return;
+    }
+
+    if (password.length < 6) {
+      registerError.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+      registerError.style.display = 'block';
+      return;
+    }
+
+    setRegisterLoading(true);
+
+    try {
+      const data = await signUp(email, password);
+      showToast('¡Cuenta creada con éxito!');
+
+      if (data && data.session && data.session.user) {
+        await handleAuthenticated(data.session.user);
+      } else {
+        // Requires email verification or manual login
+        showToast('Registro exitoso. Ya puedes iniciar sesión.', 'success');
+        formRegister.reset();
+        formRegister.style.display = 'none';
+        formLogin.style.display = 'block';
+        loginDivider.style.display = 'block';
+        btnShowRegister.style.display = 'block';
+        loginEmail.value = email;
+      }
+    } catch (err) {
+      console.error('Register error:', err);
+      registerError.textContent = formatAuthError(err.message);
+      registerError.style.display = 'block';
+    } finally {
+      setRegisterLoading(false);
+    }
+  });
+
+  // Handle Logout
+  btnLogout.addEventListener('click', async () => {
+    try {
+      await signOut();
+      showToast('Sesión cerrada');
+      handleUnauthenticated();
+    } catch (err) {
+      console.error('Logout error:', err);
+      showToast('Error al cerrar sesión', 'error');
+    }
+  });
+}
+
+function hideErrors() {
+  loginError.style.display = 'none';
+  registerError.style.display = 'none';
+}
+
+function setLoginLoading(loading) {
+  btnLogin.disabled = loading;
+  btnLoginText.style.display = loading ? 'none' : 'inline';
+  btnLoginSpinner.style.display = loading ? 'inline-block' : 'none';
+}
+
+function setRegisterLoading(loading) {
+  btnRegister.disabled = loading;
+  btnRegisterText.style.display = loading ? 'none' : 'inline';
+  btnRegisterSpinner.style.display = loading ? 'inline-block' : 'none';
+}
+
+function formatAuthError(msg) {
+  if (!msg) return 'Ocurrió un error. Intenta nuevamente.';
+  if (msg.includes('Invalid login credentials')) return 'Correo o contraseña incorrectos.';
+  if (msg.includes('User already registered')) return 'Este correo ya se encuentra registrado.';
+  if (msg.includes('Password should be at least')) return 'La contraseña debe tener mínimo 6 caracteres.';
+  if (msg.includes('Email not confirmed')) return 'Por favor confirma tu correo electrónico antes de entrar.';
+  return msg;
+}
+
+async function handleAuthenticated(user) {
+  currentUser = user;
+
+  // Retrieve user profile
+  try {
+    currentProfile = await getProfile(user.id);
+  } catch (e) {
+    console.warn('No se pudo cargar el perfil específico:', e);
+    currentProfile = { rol: 'usuario', email: user.email };
+  }
+
+  // Update session bar UI
+  sessionEmail.textContent = user.email;
+  const rol = (currentProfile && currentProfile.rol) ? currentProfile.rol : 'usuario';
+  sessionRoleBadge.textContent = rol === 'admin' ? '👑 Admin' : rol === 'agente' ? '🛠️ Agente' : '👤 Usuario';
+  sessionRoleBadge.className = `session-role-badge role-${rol}`;
+
+  // Role permissions
+  const isAdmin = rol === 'admin';
+  $$('.admin-only').forEach((el) => {
+    el.style.display = isAdmin ? '' : 'none';
+  });
+
+  // Switch screens
+  loginScreen.style.display = 'none';
+  appContainer.style.display = 'block';
+
+  // Load fresh application data
+  await Promise.all([loadAreas(), loadUsuarios(), loadTickets()]);
+
+  if (isAdmin) {
+    await loadPerfiles();
+  }
+}
+
+function handleUnauthenticated() {
+  currentUser = null;
+  currentProfile = null;
+  loginScreen.style.display = 'flex';
+  appContainer.style.display = 'none';
+  formLogin.reset();
+  formRegister.reset();
+  hideErrors();
+}
 
 // ============================================
 // Tab Navigation
@@ -116,13 +364,22 @@ function setupTabs() {
     if (!btn) return;
 
     const tab = btn.dataset.tab;
+    activateTab(tab);
 
-    tabBtns.forEach((b) => b.classList.remove('active'));
-    tabPanels.forEach((p) => p.classList.remove('active'));
-
-    btn.classList.add('active');
-    $(`#panel-${tab}`).classList.add('active');
+    if (tab === 'admin' && currentProfile && currentProfile.rol === 'admin') {
+      loadPerfiles();
+    }
   });
+}
+
+function activateTab(tabName) {
+  tabBtns.forEach((b) => b.classList.remove('active'));
+  tabPanels.forEach((p) => p.classList.remove('active'));
+
+  const btn = $(`[data-tab="${tabName}"]`);
+  const panel = $(`#panel-${tabName}`);
+  if (btn) btn.classList.add('active');
+  if (panel) panel.classList.add('active');
 }
 
 // ============================================
@@ -131,9 +388,9 @@ function setupTabs() {
 function showToast(message, type = 'success') {
   const toast = document.createElement('div');
   toast.className = `toast toast-${type}`;
-  toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> ${message}`;
+  toast.innerHTML = `<span>${type === 'success' ? '✅' : '❌'}</span> <span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => toast.remove(), 3500);
 }
 
 // ============================================
@@ -154,11 +411,13 @@ function getWeekBounds() {
 }
 
 function formatDateShort(dateStr) {
+  if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' });
 }
 
 function formatDateFull(dateStr) {
+  if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'long', year: 'numeric' });
 }
@@ -174,6 +433,7 @@ function updateWeekLabel() {
 // ============================================
 async function loadAreas() {
   try {
+    areasLoading.style.display = 'flex';
     areas = await fetchAreas();
     renderAreas();
     populateAreaSelects();
@@ -212,6 +472,10 @@ function populateAreaSelects() {
   const options = areas.map((a) => `<option value="${a.id}">${escapeHtml(a.nombre)}</option>`).join('');
   const defaultOption = '<option value="">Seleccionar área...</option>';
   usuarioArea.innerHTML = defaultOption + options;
+
+  if (adminEditArea) {
+    adminEditArea.innerHTML = '<option value="">Sin área (acceso general)</option>' + options;
+  }
 }
 
 function setupAreaForm() {
@@ -231,7 +495,6 @@ function setupAreaForm() {
       }
       formArea.reset();
       await loadAreas();
-      // Refresh usuarios since they show area names
       await loadUsuarios();
     } catch (err) {
       console.error('Error saving area:', err);
@@ -260,7 +523,6 @@ window.editArea = function (id) {
   btnAreaSubmit.textContent = 'Actualizar Área';
   btnAreaCancel.style.display = 'block';
 
-  // Switch to areas tab
   activateTab('areas');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 };
@@ -283,6 +545,7 @@ window.removeArea = async function (id) {
 // ============================================
 async function loadUsuarios() {
   try {
+    usuariosLoading.style.display = 'flex';
     usuarios = await fetchUsuarios();
     renderUsuarios();
     populateUsuarioSelects();
@@ -391,10 +654,11 @@ window.removeUsuario = async function (id) {
 };
 
 // ============================================
-// TICKETS CRUD
+// TICKETS CRUD (M1)
 // ============================================
 async function loadTickets() {
   try {
+    ticketsLoading.style.display = 'flex';
     tickets = await fetchTickets();
     renderTickets();
     updateStats();
@@ -420,7 +684,14 @@ function renderTickets() {
   ticketsTbody.innerHTML = tickets.map((t) => {
     const userName = t.usuarios ? t.usuarios.nombre : 'Desconocido';
     const areaName = t.usuarios && t.usuarios.areas ? t.usuarios.areas.nombre : '—';
-    const statusLabel = { abierto: 'Abierto', en_progreso: 'En progreso', cerrado: 'Cerrado' };
+    const statusMap = {
+      abierto: 'Abierto',
+      asignado: 'Asignado',
+      en_progreso: 'En progreso',
+      en_espera: 'En espera',
+      resuelto: 'Resuelto',
+      cerrado: 'Cerrado'
+    };
 
     return `
       <tr>
@@ -428,7 +699,7 @@ function renderTickets() {
         <td>${escapeHtml(userName)}</td>
         <td>${escapeHtml(areaName)}</td>
         <td class="td-description" title="${escapeHtml(t.problema)}">${escapeHtml(t.problema)}</td>
-        <td><span class="status-badge status-${t.status}">${statusLabel[t.status] || t.status}</span></td>
+        <td><span class="status-badge status-${t.status}">${statusMap[t.status] || t.status}</span></td>
         <td class="td-actions">
           <button class="btn btn-secondary btn-sm btn-icon" onclick="viewTicket('${t.id}')" title="Ver detalle">👁️</button>
           <button class="btn btn-secondary btn-sm btn-icon" onclick="editTicket('${t.id}')" title="Editar">✏️</button>
@@ -449,8 +720,8 @@ function updateStats() {
   tickets.forEach((t) => {
     const d = new Date(t.fecha + 'T00:00:00');
     if (d >= monday && d <= friday) weekTotal++;
-    if (t.status === 'abierto' || t.status === 'en_progreso') openCount++;
-    if (t.status === 'cerrado') closedCount++;
+    if (t.status === 'abierto' || t.status === 'asignado' || t.status === 'en_progreso' || t.status === 'en_espera') openCount++;
+    if (t.status === 'cerrado' || t.status === 'resuelto') closedCount++;
   });
 
   statTotal.textContent = weekTotal;
@@ -531,7 +802,14 @@ window.viewTicket = function (id) {
 
   const userName = t.usuarios ? t.usuarios.nombre : 'Desconocido';
   const areaName = t.usuarios && t.usuarios.areas ? t.usuarios.areas.nombre : '—';
-  const statusLabel = { abierto: 'Abierto', en_progreso: 'En progreso', cerrado: 'Cerrado' };
+  const statusMap = {
+    abierto: 'Abierto',
+    asignado: 'Asignado',
+    en_progreso: 'En progreso',
+    en_espera: 'En espera',
+    resuelto: 'Resuelto',
+    cerrado: 'Cerrado'
+  };
 
   modalDetailBody.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:16px;">
@@ -551,7 +829,7 @@ window.viewTicket = function (id) {
       </div>
       <div>
         <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Estado</div>
-        <span class="status-badge status-${t.status}">${statusLabel[t.status] || t.status}</span>
+        <span class="status-badge status-${t.status}">${statusMap[t.status] || t.status}</span>
       </div>
       <div>
         <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:4px;">Problema</div>
@@ -585,7 +863,92 @@ window.removeTicket = async function (id) {
 };
 
 // ============================================
-// Modal
+// ADMIN PANEL (M2)
+// ============================================
+async function loadPerfiles() {
+  if (!currentUser || (currentProfile && currentProfile.rol !== 'admin')) return;
+
+  try {
+    adminLoading.style.display = 'flex';
+    perfiles = await fetchPerfiles();
+    renderPerfiles();
+  } catch (err) {
+    console.error('Error loading perfiles:', err);
+    showToast('Error al cargar cuentas de acceso', 'error');
+  } finally {
+    adminLoading.style.display = 'none';
+  }
+}
+
+function renderPerfiles() {
+  if (perfiles.length === 0) {
+    adminTableWrapper.style.display = 'none';
+    adminEmpty.style.display = 'block';
+    return;
+  }
+
+  adminEmpty.style.display = 'none';
+  adminTableWrapper.style.display = 'block';
+
+  adminTbody.innerHTML = perfiles.map((p) => {
+    const areaName = p.areas ? p.areas.nombre : 'Acceso general';
+    const rolMap = { admin: 'Administrador', agente: 'Agente IT', usuario: 'Usuario' };
+    const dateStr = p.created_at ? new Date(p.created_at).toLocaleDateString('es-MX') : '—';
+
+    return `
+      <tr>
+        <td>${escapeHtml(p.email)}</td>
+        <td><span class="session-role-badge role-${p.rol}">${rolMap[p.rol] || p.rol}</span></td>
+        <td>${escapeHtml(areaName)}</td>
+        <td>${dateStr}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="editPerfil('${p.id}')">Editar</button>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+window.editPerfil = function (id) {
+  const p = perfiles.find((item) => item.id === id);
+  if (!p) return;
+
+  adminEditId.value = p.id;
+  adminEditEmail.value = p.email;
+  adminEditRol.value = p.rol;
+  adminEditArea.value = p.area_id || '';
+
+  modalAdminEdit.classList.add('active');
+};
+
+function setupAdminModal() {
+  modalCloseAdmin.addEventListener('click', () => modalAdminEdit.classList.remove('active'));
+  btnAdminEditCancel.addEventListener('click', () => modalAdminEdit.classList.remove('active'));
+
+  modalAdminEdit.addEventListener('click', (e) => {
+    if (e.target === modalAdminEdit) modalAdminEdit.classList.remove('active');
+  });
+
+  formAdminEdit.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = adminEditId.value;
+    const rol = adminEditRol.value;
+    const area_id = adminEditArea.value || null;
+
+    try {
+      await updatePerfil(id, { rol, area_id });
+      showToast('Cuenta actualizada con éxito');
+      modalAdminEdit.classList.remove('active');
+      await loadPerfiles();
+    } catch (err) {
+      console.error('Error updating perfil:', err);
+      showToast('Error al actualizar cuenta', 'error');
+    }
+  });
+}
+
+// ============================================
+// Modals & PDF
 // ============================================
 function setupModal() {
   modalCloseDetail.addEventListener('click', () => {
@@ -599,14 +962,16 @@ function setupModal() {
   });
 }
 
-// ============================================
-// PDF Generation
-// ============================================
 function setupPdf() {
   btnPdf.addEventListener('click', generateWeeklyPdf);
 }
 
 function generateWeeklyPdf() {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showToast('Biblioteca PDF no cargada', 'error');
+    return;
+  }
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
 
@@ -642,7 +1007,14 @@ function generateWeeklyPdf() {
     const tableData = weekTickets.map((t) => {
       const userName = t.usuarios ? t.usuarios.nombre : 'Desconocido';
       const areaName = t.usuarios && t.usuarios.areas ? t.usuarios.areas.nombre : '—';
-      const statusLabel = { abierto: 'Abierto', en_progreso: 'En progreso', cerrado: 'Cerrado' };
+      const statusMap = {
+        abierto: 'Abierto',
+        asignado: 'Asignado',
+        en_progreso: 'En progreso',
+        en_espera: 'En espera',
+        resuelto: 'Resuelto',
+        cerrado: 'Cerrado'
+      };
       return [
         t.fecha,
         userName,
@@ -650,7 +1022,7 @@ function generateWeeklyPdf() {
         t.problema,
         t.dx || '—',
         t.solucion || '—',
-        statusLabel[t.status] || t.status,
+        statusMap[t.status] || t.status,
       ];
     });
 
@@ -678,20 +1050,7 @@ function generateWeeklyPdf() {
 }
 
 // ============================================
-// Tab Helper
-// ============================================
-function activateTab(tabName) {
-  tabBtns.forEach((b) => b.classList.remove('active'));
-  tabPanels.forEach((p) => p.classList.remove('active'));
-
-  const btn = $(`[data-tab="${tabName}"]`);
-  const panel = $(`#panel-${tabName}`);
-  if (btn) btn.classList.add('active');
-  if (panel) panel.classList.add('active');
-}
-
-// ============================================
-// Utilities
+// Utilities & Theme
 // ============================================
 function escapeHtml(str) {
   if (!str) return '';
@@ -700,9 +1059,6 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-// ============================================
-// Setup all forms
-// ============================================
 function setupForms() {
   setupAreaForm();
   setupUsuarioForm();
@@ -710,9 +1066,6 @@ function setupForms() {
   setupPdf();
 }
 
-// ============================================
-// Theme Toggle (Dark / Light)
-// ============================================
 function initTheme() {
   const saved = localStorage.getItem('theme') || 'dark';
   applyTheme(saved);
