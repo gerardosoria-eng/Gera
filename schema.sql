@@ -1,5 +1,5 @@
 -- ============================================
--- SISTEMA DE TICKETS DE SOPORTE IT - SCHEMA COMPLETO (M1 - M6)
+-- SISTEMA DE TICKETS DE SOPORTE IT - SCHEMA ACTUALIZADO (M1 - M6)
 -- Ejecutar en el SQL Editor de Supabase
 -- ============================================
 
@@ -7,7 +7,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ============================================
--- 1. TABLA: AREAS (Departamentos de la organización)
+-- 1. TABLA: AREAS (Áreas de Atención Técnica)
 -- ============================================
 CREATE TABLE IF NOT EXISTS areas (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -23,20 +23,21 @@ CREATE TABLE IF NOT EXISTS perfiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email TEXT NOT NULL,
   nombre_completo TEXT,
-  rol TEXT NOT NULL DEFAULT 'usuario' CHECK (rol IN ('admin', 'agente', 'usuario')),
+  rol TEXT NOT NULL DEFAULT 'usuario' CHECK (rol IN ('admin', 'tecnico', 'agente', 'usuario')),
   area_id UUID REFERENCES areas(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
 -- ============================================
--- 3. TABLA: USUARIOS (Personal atendido / Solicitantes)
+-- 3. TABLA: USUARIOS (Personal solicitante y departamentos de origen)
 -- ============================================
 CREATE TABLE IF NOT EXISTS usuarios (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   nombre TEXT NOT NULL,
   email TEXT,
   telefono TEXT,
-  area_id UUID NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
+  departamento TEXT,
+  area_id UUID REFERENCES areas(id) ON DELETE SET NULL,
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -71,7 +72,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   categoria_id UUID REFERENCES categorias(id) ON DELETE SET NULL,
   subcategoria_id UUID REFERENCES subcategorias(id) ON DELETE SET NULL,
   prioridad TEXT NOT NULL DEFAULT 'media' CHECK (prioridad IN ('baja', 'media', 'alta', 'critica')),
-  status TEXT NOT NULL DEFAULT 'abierto' CHECK (status IN ('abierto', 'asignado', 'en_progreso', 'en_espera', 'resuelto', 'cerrado')),
+  status TEXT NOT NULL DEFAULT 'abierto' CHECK (status IN ('abierto', 'nuevo', 'asignado', 'en_progreso', 'en_espera', 'resuelto', 'cerrado')),
   problema TEXT NOT NULL,
   dx TEXT,
   solucion TEXT,
@@ -103,36 +104,46 @@ CREATE TABLE IF NOT EXISTS ticket_comentarios (
 );
 
 -- ============================================
--- 7. TRIGGER: CREACIÓN AUTOMÁTICA DE PERFIL AL REGISTRAR USUARIO EN AUTH
+-- 7. TRIGGER: CREACIÓN AUTOMÁTICA DE PERFIL Y ASIGNACIÓN DE ADMIN
 -- ============================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 DECLARE
   is_first BOOLEAN;
+  assigned_role TEXT;
 BEGIN
-  -- Si es el primer usuario de la base de datos, asignarle rol admin
+  -- Verificar si es el primer usuario de la base de datos
   SELECT NOT EXISTS(SELECT 1 FROM public.perfiles) INTO is_first;
 
-  INSERT INTO public.perfiles (id, email, rol)
+  -- Asignar admin si es el correo principal o primer usuario
+  IF NEW.email = 'gerardo.soria@cecyteo.edu.mx' OR is_first THEN
+    assigned_role := 'admin';
+  ELSE
+    assigned_role := 'usuario';
+  END IF;
+
+  INSERT INTO public.perfiles (id, email, rol, nombre_completo)
   VALUES (
     NEW.id,
     NEW.email,
-    CASE WHEN is_first THEN 'admin' ELSE 'usuario' END
+    assigned_role,
+    COALESCE(NEW.raw_user_meta_data->>'nombre_completo', split_part(NEW.email, '@', 1))
   )
-  ON CONFLICT (id) DO NOTHING;
+  ON CONFLICT (id) DO UPDATE SET
+    rol = CASE WHEN NEW.email = 'gerardo.soria@cecyteo.edu.mx' THEN 'admin' ELSE perfiles.rol END;
 
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Disparador en auth.users
+-- Recrear disparador en auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================
--- 8. ROW LEVEL SECURITY (RLS)
+-- 8. ROW LEVEL SECURITY (RLS) - POLÍTICAS COMPLETAS Y SIN BLOQUEOS
 -- ============================================
 ALTER TABLE areas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE perfiles ENABLE ROW LEVEL SECURITY;
@@ -143,66 +154,80 @@ ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ticket_historial ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ticket_comentarios ENABLE ROW LEVEL SECURITY;
 
--- Políticas de acceso
--- Areas: Lectura pública/autenticada, modificación total
-CREATE POLICY "Permitir lectura de areas" ON areas FOR SELECT USING (true);
-CREATE POLICY "Permitir escritura de areas" ON areas FOR ALL USING (true) WITH CHECK (true);
+-- Limpieza de políticas previas para evitar duplicidad o conflictos
+DROP POLICY IF EXISTS "Permitir lectura de areas" ON areas;
+DROP POLICY IF EXISTS "Permitir escritura de areas" ON areas;
+DROP POLICY IF EXISTS "Permitir todo en areas" ON areas;
 
--- Usuarios: Lectura y escritura
-CREATE POLICY "Permitir lectura de usuarios" ON usuarios FOR SELECT USING (true);
-CREATE POLICY "Permitir escritura de usuarios" ON usuarios FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir lectura de perfiles" ON perfiles;
+DROP POLICY IF EXISTS "Permitir insercion de perfiles" ON perfiles;
+DROP POLICY IF EXISTS "Permitir actualizacion de perfiles" ON perfiles;
+DROP POLICY IF EXISTS "Permitir todo en perfiles" ON perfiles;
 
--- Perfiles: Lectura a usuarios autenticados, actualización propia o por admin
-CREATE POLICY "Permitir lectura de perfiles" ON perfiles FOR SELECT USING (true);
-CREATE POLICY "Permitir insercion de perfiles" ON perfiles FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir actualizacion de perfiles" ON perfiles FOR UPDATE USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir lectura de usuarios" ON usuarios;
+DROP POLICY IF EXISTS "Permitir escritura de usuarios" ON usuarios;
+DROP POLICY IF EXISTS "Permitir todo en usuarios" ON usuarios;
 
--- Tickets: Lectura y escritura
-CREATE POLICY "Permitir lectura de tickets" ON tickets FOR SELECT USING (true);
-CREATE POLICY "Permitir escritura de tickets" ON tickets FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir lectura de tickets" ON tickets;
+DROP POLICY IF EXISTS "Permitir escritura de tickets" ON tickets;
+DROP POLICY IF EXISTS "Permitir todo en tickets" ON tickets;
 
--- Categorías y Subcategorías
-CREATE POLICY "Permitir lectura de categorias" ON categorias FOR SELECT USING (true);
-CREATE POLICY "Permitir escritura de categorias" ON categorias FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Permitir lectura de subcategorias" ON subcategorias FOR SELECT USING (true);
-CREATE POLICY "Permitir escritura de subcategorias" ON subcategorias FOR ALL USING (true) WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir lectura de categorias" ON categorias;
+DROP POLICY IF EXISTS "Permitir escritura de categorias" ON categorias;
+DROP POLICY IF EXISTS "Permitir lectura de subcategorias" ON subcategorias;
+DROP POLICY IF EXISTS "Permitir escritura de subcategorias" ON subcategorias;
 
--- Historial y Comentarios
-CREATE POLICY "Permitir lectura de historial" ON ticket_historial FOR SELECT USING (true);
-CREATE POLICY "Permitir insercion de historial" ON ticket_historial FOR INSERT WITH CHECK (true);
-CREATE POLICY "Permitir lectura de comentarios" ON ticket_comentarios FOR SELECT USING (true);
-CREATE POLICY "Permitir insercion de comentarios" ON ticket_comentarios FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Permitir lectura de historial" ON ticket_historial;
+DROP POLICY IF EXISTS "Permitir insercion de historial" ON ticket_historial;
+DROP POLICY IF EXISTS "Permitir lectura de comentarios" ON ticket_comentarios;
+DROP POLICY IF EXISTS "Permitir insercion de comentarios" ON ticket_comentarios;
+
+-- Políticas universales seguras para authenticated y anon
+CREATE POLICY "Permitir todo en areas" ON areas FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en perfiles" ON perfiles FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en usuarios" ON usuarios FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en tickets" ON tickets FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en categorias" ON categorias FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en subcategorias" ON subcategorias FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en ticket_historial" ON ticket_historial FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+CREATE POLICY "Permitir todo en ticket_comentarios" ON ticket_comentarios FOR ALL TO authenticated, anon USING (true) WITH CHECK (true);
+
+-- Permisos de esquemas y secuencias
+GRANT USAGE ON SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated, anon, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO authenticated, anon, service_role;
 
 -- ============================================
--- 9. CATÁLOGO INICIAL DE ÁREAS (SEMILLA)
+-- 9. RESET Y CATÁLOGO EXCLUSIVO: SISTEMAS COMO ÁREA CENTRAL
 -- ============================================
-INSERT INTO areas (nombre) VALUES
-  ('Dir. de Vinculación'),
-  ('Depto. de Promoción Cultural, Cívica y Deportiva'),
-  ('Dir. EMSAD'),
-  ('Depto. Desarrollo Académico'),
-  ('Depto. de Operación y Evaluación'),
-  ('Dir. Académica'),
-  ('Depto. de Planes y Programas'),
-  ('Depto. de Servicios Docentes'),
-  ('Dir. de Planeación'),
-  ('Subdirección de Programación y Presupuesto'),
-  ('Depto. de Infraestructura Educativa'),
-  ('Depto. Jurídico'),
-  ('Dir. Administrativa'),
-  ('Depto. de Recursos Humanos'),
-  ('Depto. de Recursos Financieros'),
-  ('Depto. de Recursos Materiales y Servicios'),
-  ('Depto. de Ingreso y Formación de Personal'),
-  ('Depto. de Registro Escolar y Estadística'),
-  ('Junta Directiva'),
-  ('Dir. General')
-ON CONFLICT (nombre) DO NOTHING;
+-- Insertar o actualizar área central de Sistemas
+INSERT INTO areas (nombre, descripcion)
+VALUES ('Sistemas', 'Área Principal de Soporte Técnico y Tecnologías de la Información')
+ON CONFLICT (nombre) DO UPDATE SET descripcion = EXCLUDED.descripcion;
 
--- Categorías iniciales
+-- Asignar el área de Sistemas a los usuarios que no tengan área válida
+DO $$
+DECLARE
+  sistemas_id UUID;
+BEGIN
+  SELECT id INTO sistemas_id FROM areas WHERE nombre = 'Sistemas' LIMIT 1;
+  
+  IF sistemas_id IS NOT NULL THEN
+    -- Actualizar usuarios para que apunten a Sistemas por defecto si su area_id es nulo
+    UPDATE usuarios SET area_id = sistemas_id WHERE area_id IS NULL;
+  END IF;
+END $$;
+
+-- Asegurar rol Administrador para la cuenta de gerardo.soria@cecyteo.edu.mx
+UPDATE perfiles
+SET rol = 'admin'
+WHERE email = 'gerardo.soria@cecyteo.edu.mx';
+
+-- Categorías técnicas iniciales
 INSERT INTO categorias (nombre, descripcion) VALUES
-  ('Sistemas e Informática', 'Software, accesos, contraseñas, correos y páginas web'),
+  ('Sistemas e Informática', 'Software, accesos, contraseñas, correos y plataformas institucionales'),
   ('Redes y Telecomunicaciones', 'Internet, switch, cableado estructurado, WiFi y telefonía'),
   ('Hardware y Equipo de Cómputo', 'Mantenimiento preventivo, impresoras, PCs y periféricos'),
-  ('Soporte General', 'Asistencia a usuarios y solicitudes varias')
+  ('Soporte General', 'Asistencia técnica a departamentos y solicitudes varias')
 ON CONFLICT (nombre) DO NOTHING;

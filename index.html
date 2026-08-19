@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Soporte IT — Sistema de Registro</title>
+    <title>Soporte IT — CECyTEO</title>
     <meta name="description"
-        content="Sistema de registro y seguimiento de tickets de soporte técnico IT. Gestiona áreas, usuarios y genera reportes semanales.">
+        content="Sistema de registro, asignación y seguimiento de tickets de soporte técnico IT.">
     <link rel="icon"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖥️</text></svg>">
     <link rel="stylesheet" href="style.css">
@@ -21,12 +21,12 @@
         <div class="login-card">
             <div class="login-logo">🖥️</div>
             <h1 class="login-title">Soporte IT</h1>
-            <p class="login-subtitle">Inicia sesión para continuar</p>
+            <p class="login-subtitle">Sistema de Tickets y Mesa de Ayuda</p>
 
             <form id="form-login" class="login-form">
                 <div class="form-group">
                     <label for="login-email">Correo electrónico</label>
-                    <input type="email" id="login-email" placeholder="correo@ejemplo.com" required autocomplete="email">
+                    <input type="email" id="login-email" placeholder="correo@cecyteo.edu.mx" required autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label for="login-password">Contraseña</label>
@@ -50,8 +50,12 @@
             <!-- Register form (hidden by default) -->
             <form id="form-register" class="login-form" style="display:none;">
                 <div class="form-group">
-                    <label for="register-email">Correo electrónico</label>
-                    <input type="email" id="register-email" placeholder="correo@ejemplo.com" required autocomplete="email">
+                    <label for="register-nombre">Nombre completo</label>
+                    <input type="text" id="register-nombre" placeholder="Ej. Ing. Gerardo Soria" autocomplete="name">
+                </div>
+                <div class="form-group">
+                    <label for="register-email">Correo electrónico institucional</label>
+                    <input type="email" id="register-email" placeholder="usuario@cecyteo.edu.mx" required autocomplete="email">
                 </div>
                 <div class="form-group">
                     <label for="register-password">Contraseña</label>
@@ -79,8 +83,10 @@
     <div class="app-container" id="app-container" style="display:none;">
         <!-- Header -->
         <header class="app-header">
-            <h1>🖥️ Soporte IT</h1>
-            <p>Sistema de registro y seguimiento</p>
+            <div class="brand-group">
+                <h1>🖥️ Soporte IT — CECyTEO</h1>
+                <p>Gestión y Control de Incidencias Técnicas</p>
+            </div>
 
             <!-- Session indicator -->
             <div class="session-bar" id="session-bar">
@@ -88,8 +94,8 @@
                     <span class="session-email" id="session-email"></span>
                     <span class="session-role-badge" id="session-role-badge"></span>
                 </div>
-                <button class="btn btn-secondary btn-sm" id="btn-logout" type="button">
-                    🚪 Cerrar Sesión
+                <button class="btn btn-secondary btn-sm" id="btn-logout" type="button" title="Cerrar sesión">
+                    🚪 Salir
                 </button>
             </div>
 
@@ -108,17 +114,17 @@
             </button>
             <button class="tab-btn" data-tab="usuarios" id="tab-btn-usuarios">
                 <span>👥</span>
-                <span class="tab-label">Usuarios</span>
+                <span class="tab-label">Solicitantes</span>
                 <span class="badge" id="badge-usuarios">0</span>
             </button>
             <button class="tab-btn" data-tab="areas" id="tab-btn-areas">
                 <span>🏢</span>
-                <span class="tab-label">Áreas</span>
+                <span class="tab-label">Áreas de Atención</span>
                 <span class="badge" id="badge-areas">0</span>
             </button>
             <button class="tab-btn admin-only" data-tab="admin" id="tab-btn-admin">
                 <span>⚙️</span>
-                <span class="tab-label">Admin</span>
+                <span class="tab-label">Panel Admin</span>
             </button>
         </nav>
 
@@ -135,19 +141,23 @@
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-open">0</div>
-                    <div class="stat-label">Abiertos</div>
+                    <div class="stat-label">Abiertos / Asignados</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="stat-in-progress">0</div>
+                    <div class="stat-label">En Progreso</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-closed">0</div>
-                    <div class="stat-label">Cerrados</div>
+                    <div class="stat-label">Resueltos / Cerrados</div>
                 </div>
             </div>
 
-            <!-- PDF Report -->
+            <!-- PDF Report Bar -->
             <div class="pdf-section">
                 <div class="week-label" id="week-label"></div>
                 <button class="btn btn-secondary btn-sm" id="btn-pdf" type="button">
-                    📄 Generar Reporte PDF
+                    📄 Generar Reporte Semanal PDF
                 </button>
             </div>
 
@@ -155,49 +165,69 @@
             <div class="card" id="card-ticket-form">
                 <h2 class="card-title">
                     <span class="icon">✏️</span>
-                    <span id="ticket-form-title">Nuevo Ticket</span>
+                    <span id="ticket-form-title">Registrar Ticket de Soporte</span>
                 </h2>
                 <form id="form-ticket">
                     <div class="form-row">
                         <div class="form-group">
-                            <label for="ticket-fecha">Fecha</label>
+                            <label for="ticket-fecha">Fecha de Reporte</label>
                             <input type="date" id="ticket-fecha" required>
                         </div>
                         <div class="form-group">
-                            <label for="ticket-usuario">Usuario atendido</label>
+                            <label for="ticket-usuario">Usuario Solicitante</label>
                             <select id="ticket-usuario" required>
-                                <option value="">Seleccionar usuario...</option>
+                                <option value="">Seleccionar solicitante...</option>
                             </select>
                         </div>
                     </div>
                     <div class="form-row">
                         <div class="form-group">
+                            <label for="ticket-prioridad">Prioridad</label>
+                            <select id="ticket-prioridad" required>
+                                <option value="baja">Baja (48h)</option>
+                                <option value="media" selected>Media (24h)</option>
+                                <option value="alta">Alta (8h)</option>
+                                <option value="critica">Crítica (2h)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label for="ticket-status">Estado</label>
                             <select id="ticket-status" required>
                                 <option value="abierto">Abierto</option>
+                                <option value="asignado">Asignado</option>
                                 <option value="en_progreso">En progreso</option>
+                                <option value="en_espera">En espera</option>
+                                <option value="resuelto">Resuelto</option>
                                 <option value="cerrado">Cerrado</option>
                             </select>
                         </div>
-                        <div class="form-group">&nbsp;</div>
+                    </div>
+
+                    <!-- Asignación de Técnico (Administrador) -->
+                    <div class="form-group admin-only" id="group-ticket-tecnico">
+                        <label for="ticket-tecnico">Asignar a Técnico de Sistemas (Exclusivo Admin)</label>
+                        <select id="ticket-tecnico">
+                            <option value="">Sin técnico asignado (Pendiente)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ticket-problema">Descripción del Problema</label>
+                        <textarea id="ticket-problema" placeholder="Describe detalladamente la falla técnica, equipo o servicio afectado..."
+                            required rows="3"></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="ticket-problema">Problema</label>
-                        <textarea id="ticket-problema" placeholder="Describe el problema reportado..."
-                            required></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="ticket-dx">Diagnóstico</label>
-                        <textarea id="ticket-dx" placeholder="Tu diagnóstico del problema (opcional)..."
+                        <label for="ticket-dx">Diagnóstico Técnico (Opcional)</label>
+                        <textarea id="ticket-dx" placeholder="Diagnóstico de la causa raíz o componentes revisados..."
                             rows="2"></textarea>
                     </div>
                     <div class="form-group">
-                        <label for="ticket-solucion">Solución</label>
-                        <textarea id="ticket-solucion" placeholder="Cómo se resolvió (opcional)..." rows="2"></textarea>
+                        <label for="ticket-solucion">Solución Aplicada (Opcional)</label>
+                        <textarea id="ticket-solucion" placeholder="Procedimiento de reparación, configuraciones realizadas o refacciones..." rows="2"></textarea>
                     </div>
                     <div class="btn-group">
                         <button type="submit" class="btn btn-primary btn-block" id="btn-ticket-submit">
-                            Registrar Ticket
+                            Guardar Ticket
                         </button>
                         <button type="button" class="btn btn-secondary" id="btn-ticket-cancel" style="display:none;">
                             Cancelar
@@ -206,12 +236,34 @@
                 </form>
             </div>
 
-            <!-- Tickets Table -->
+            <!-- Tickets Table & Filter Pills -->
             <div class="card">
-                <h2 class="card-title">
-                    <span class="icon">📋</span>
-                    Historial de Tickets
-                </h2>
+                <div class="table-header-flex">
+                    <h2 class="card-title" style="margin-bottom:0;">
+                        <span class="icon">📋</span>
+                        Bandeja de Tickets
+                    </h2>
+                </div>
+
+                <!-- Filtros Rápidos por Estado -->
+                <div class="filter-pills-container">
+                    <button class="filter-pill active" data-filter="todos">
+                        Todos <span class="pill-count" id="pill-count-todos">0</span>
+                    </button>
+                    <button class="filter-pill" data-filter="abiertos">
+                        Abiertos / Asignados <span class="pill-count" id="pill-count-abiertos">0</span>
+                    </button>
+                    <button class="filter-pill" data-filter="en_progreso">
+                        En Progreso <span class="pill-count" id="pill-count-en_progreso">0</span>
+                    </button>
+                    <button class="filter-pill" data-filter="resuelto">
+                        Resueltos <span class="pill-count" id="pill-count-resuelto">0</span>
+                    </button>
+                    <button class="filter-pill" data-filter="cerrado">
+                        Cerrados <span class="pill-count" id="pill-count-cerrado">0</span>
+                    </button>
+                </div>
+
                 <div id="tickets-loading" class="loading-overlay">
                     <div class="spinner"></div>
                     Cargando tickets...
@@ -221,9 +273,10 @@
                         <thead>
                             <tr>
                                 <th>Fecha</th>
-                                <th>Usuario</th>
-                                <th>Área</th>
+                                <th>Solicitante</th>
+                                <th>Departamento</th>
                                 <th>Problema</th>
+                                <th>Técnico Asignado</th>
                                 <th>Estado</th>
                                 <th>Acciones</th>
                             </tr>
@@ -233,37 +286,63 @@
                 </div>
                 <div id="tickets-empty" class="empty-state" style="display:none;">
                     <span class="icon">📭</span>
-                    <p>No hay tickets registrados aún</p>
+                    <p>No hay tickets para el filtro seleccionado</p>
                 </div>
             </div>
         </section>
 
         <!-- =========================================
-         TAB: USUARIOS
+         TAB: SOLICITANTES (USUARIOS)
          ========================================= -->
         <section class="tab-panel" id="panel-usuarios">
             <!-- User Form -->
             <div class="card">
                 <h2 class="card-title">
                     <span class="icon">➕</span>
-                    <span id="usuario-form-title">Agregar Usuario</span>
+                    <span id="usuario-form-title">Registrar Solicitante</span>
                 </h2>
                 <form id="form-usuario">
                     <div class="form-row">
                         <div class="form-group">
                             <label for="usuario-nombre">Nombre completo</label>
-                            <input type="text" id="usuario-nombre" placeholder="Ej. Juan Pérez" required>
+                            <input type="text" id="usuario-nombre" placeholder="Ej. Lic. Laura Gómez Martínez" required>
                         </div>
                         <div class="form-group">
-                            <label for="usuario-area">Área</label>
-                            <select id="usuario-area" required>
-                                <option value="">Seleccionar área...</option>
-                            </select>
+                            <label for="usuario-departamento">Departamento de Procedencia</label>
+                            <input type="text" id="usuario-departamento" list="departamentos-list" placeholder="Ej. Recursos Humanos" required>
+                            <datalist id="departamentos-list">
+                                <option value="Recursos Humanos">
+                                <option value="Recursos Financieros">
+                                <option value="Recursos Materiales y Servicios">
+                                <option value="Dirección Académica">
+                                <option value="Dirección EMSAD">
+                                <option value="Dirección de Vinculación">
+                                <option value="Dirección de Planeación">
+                                <option value="Dirección Administrativa">
+                                <option value="Dirección General">
+                                <option value="Departamento Jurídico">
+                                <option value="Planes y Programas">
+                                <option value="Servicios Docentes">
+                                <option value="Registro Escolar y Estadística">
+                                <option value="Desarrollo Académico">
+                                <option value="Promoción Cultural y Deportiva">
+                                <option value="Junta Directiva">
+                            </datalist>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="usuario-email">Correo institucional (Opcional)</label>
+                            <input type="email" id="usuario-email" placeholder="usuario@cecyteo.edu.mx">
+                        </div>
+                        <div class="form-group">
+                            <label for="usuario-telefono">Extensión / Teléfono (Opcional)</label>
+                            <input type="text" id="usuario-telefono" placeholder="Ej. Ext. 104">
                         </div>
                     </div>
                     <div class="btn-group">
                         <button type="submit" class="btn btn-primary" id="btn-usuario-submit">
-                            Agregar Usuario
+                            Guardar Solicitante
                         </button>
                         <button type="button" class="btn btn-secondary" id="btn-usuario-cancel" style="display:none;">
                             Cancelar
@@ -276,38 +355,45 @@
             <div class="card">
                 <h2 class="card-title">
                     <span class="icon">👥</span>
-                    Usuarios Registrados
+                    Directorio de Solicitantes
                 </h2>
                 <div id="usuarios-loading" class="loading-overlay">
                     <div class="spinner"></div>
-                    Cargando usuarios...
+                    Cargando solicitantes...
                 </div>
                 <div class="list-container" id="usuarios-list" style="display:none;"></div>
                 <div id="usuarios-empty" class="empty-state" style="display:none;">
                     <span class="icon">👤</span>
-                    <p>No hay usuarios registrados. Agrega el primero.</p>
+                    <p>No hay solicitantes registrados. Agrega el primero.</p>
                 </div>
             </div>
         </section>
 
         <!-- =========================================
-         TAB: ÁREAS
+         TAB: ÁREAS DE ATENCIÓN
          ========================================= -->
         <section class="tab-panel" id="panel-areas">
-            <!-- Area Form -->
+            <!-- Area Form (Admin/Técnico) -->
             <div class="card">
                 <h2 class="card-title">
-                    <span class="icon">➕</span>
-                    <span id="area-form-title">Agregar Área</span>
+                    <span class="icon">🏢</span>
+                    <span id="area-form-title">Área Central de Atención Técnica</span>
                 </h2>
+                <p class="admin-description">
+                    Las solicitudes de soporte se gestionan de forma centralizada en el <strong>Área de Sistemas</strong>.
+                </p>
                 <form id="form-area">
                     <div class="form-group">
-                        <label for="area-nombre">Nombre del área / departamento</label>
-                        <input type="text" id="area-nombre" placeholder="Ej. Recursos Humanos" required>
+                        <label for="area-nombre">Nombre del área técnica</label>
+                        <input type="text" id="area-nombre" value="Sistemas" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="area-descripcion">Descripción del servicio</label>
+                        <input type="text" id="area-descripcion" placeholder="Área Principal de Soporte Técnico y Tecnologías de la Información">
                     </div>
                     <div class="btn-group">
                         <button type="submit" class="btn btn-primary" id="btn-area-submit">
-                            Agregar Área
+                            Guardar Área
                         </button>
                         <button type="button" class="btn btn-secondary" id="btn-area-cancel" style="display:none;">
                             Cancelar
@@ -320,7 +406,7 @@
             <div class="card">
                 <h2 class="card-title">
                     <span class="icon">🏢</span>
-                    Áreas Registradas
+                    Áreas de Soporte Registradas
                 </h2>
                 <div id="areas-loading" class="loading-overlay">
                     <div class="spinner"></div>
@@ -329,22 +415,22 @@
                 <div class="list-container" id="areas-list" style="display:none;"></div>
                 <div id="areas-empty" class="empty-state" style="display:none;">
                     <span class="icon">🏗️</span>
-                    <p>No hay áreas registradas. Agrega la primera.</p>
+                    <p>No hay áreas técnicas registradas.</p>
                 </div>
             </div>
         </section>
 
         <!-- =========================================
-         TAB: ADMINISTRACIÓN (admin only)
+         TAB: ADMINISTRACIÓN (Admin Only)
          ========================================= -->
         <section class="tab-panel admin-only" id="panel-admin">
             <div class="card">
                 <h2 class="card-title">
                     <span class="icon">⚙️</span>
-                    Gestión de Cuentas del Sistema
+                    Gestión de Cuentas y Roles de Soporte
                 </h2>
                 <p class="admin-description">
-                    Administra las cuentas de acceso al sistema. Puedes cambiar roles y asignar áreas a los usuarios.
+                    Como Administrador, puedes asignar y modificar los roles de acceso: <strong>Administrador</strong>, <strong>Técnico de Sistemas</strong> o <strong>Usuario Solicitante</strong>.
                 </p>
                 <div id="admin-loading" class="loading-overlay">
                     <div class="spinner"></div>
@@ -354,8 +440,8 @@
                     <table>
                         <thead>
                             <tr>
-                                <th>Email</th>
-                                <th>Rol</th>
+                                <th>Nombre / Email</th>
+                                <th>Rol en el Sistema</th>
                                 <th>Área Asignada</th>
                                 <th>Fecha Registro</th>
                                 <th>Acciones</th>
@@ -375,22 +461,25 @@
     <!-- Toast container -->
     <div class="toast-container" id="toast-container"></div>
 
-    <!-- Ticket detail modal -->
+    <!-- Ticket Detail Modal -->
     <div class="modal-overlay" id="modal-ticket-detail">
-        <div class="modal">
+        <div class="modal modal-lg">
             <div class="modal-header">
-                <h3>Detalle del Ticket</h3>
+                <h3 id="modal-ticket-title">Detalle del Ticket de Soporte</h3>
                 <button class="modal-close" id="modal-close-detail" type="button">&times;</button>
             </div>
             <div id="modal-detail-body"></div>
+            <div class="modal-footer" id="modal-detail-footer">
+                <!-- Se llena dinámicamente con acciones como Generar PDF -->
+            </div>
         </div>
     </div>
 
-    <!-- Admin edit modal -->
+    <!-- Admin Edit Account Modal -->
     <div class="modal-overlay" id="modal-admin-edit">
         <div class="modal">
             <div class="modal-header">
-                <h3>Editar Cuenta</h3>
+                <h3>Editar Rol de Cuenta</h3>
                 <button class="modal-close" id="modal-close-admin" type="button">&times;</button>
             </div>
             <div id="modal-admin-body">
@@ -400,16 +489,15 @@
                         <input type="email" id="admin-edit-email" disabled>
                     </div>
                     <div class="form-group">
-                        <label for="admin-edit-rol">Rol</label>
-                        <select id="admin-edit-rol" required>
-                            <option value="usuario">Usuario</option>
-                            <option value="admin">Administrador</option>
-                        </select>
+                        <label for="admin-edit-nombre">Nombre completo</label>
+                        <input type="text" id="admin-edit-nombre" placeholder="Nombre completo">
                     </div>
                     <div class="form-group">
-                        <label for="admin-edit-area">Área asignada</label>
-                        <select id="admin-edit-area">
-                            <option value="">Sin área (acceso general)</option>
+                        <label for="admin-edit-rol">Rol de Acceso</label>
+                        <select id="admin-edit-rol" required>
+                            <option value="admin">👑 Administrador</option>
+                            <option value="tecnico">🛠️ Técnico de Sistemas</option>
+                            <option value="usuario">👤 Usuario Solicitante</option>
                         </select>
                     </div>
                     <input type="hidden" id="admin-edit-id">
@@ -425,7 +513,7 @@
     <!-- Supabase SDK v2 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-    <!-- jsPDF for client-side PDF generation -->
+    <!-- jsPDF & AutoTable for client-side PDF generation -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.4/jspdf.plugin.autotable.min.js"></script>
 

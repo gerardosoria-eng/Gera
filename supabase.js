@@ -80,7 +80,7 @@ function onAuthStateChange(callback) {
 }
 
 // ============================================
-// Perfiles (Admin only — RLS enforces this)
+// Perfiles & Técnicos (Admin & Agentes)
 // ============================================
 
 async function fetchPerfiles() {
@@ -90,6 +90,20 @@ async function fetchPerfiles() {
     .select('*, areas(nombre)')
     .order('created_at', { ascending: false });
   if (error) throw error;
+  return data || [];
+}
+
+async function fetchTecnicos() {
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const { data, error } = await supabaseClient
+    .from('perfiles')
+    .select('id, email, nombre_completo, rol')
+    .in('rol', ['admin', 'tecnico', 'agente'])
+    .order('email', { ascending: true });
+  if (error) {
+    console.warn('Error al obtener técnicos:', error.message);
+    return [];
+  }
   return data || [];
 }
 
@@ -106,7 +120,7 @@ async function updatePerfil(id, updates) {
 }
 
 // ============================================
-// ÁREAS CRUD
+// ÁREAS CRUD (Centralizada en Sistemas)
 // ============================================
 
 async function fetchAreas() {
@@ -154,7 +168,7 @@ async function deleteArea(id) {
 }
 
 // ============================================
-// USUARIOS CRUD
+// USUARIOS CRUD (Solicitantes y Departamentos)
 // ============================================
 
 async function fetchUsuarios() {
@@ -167,32 +181,36 @@ async function fetchUsuarios() {
   return data || [];
 }
 
-async function createUsuario(nombre, area_id, email = null, telefono = null) {
+async function createUsuario(nombre, area_id = null, email = null, telefono = null, departamento = null) {
   if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
-  const body = { nombre, area_id };
+  const body = { nombre };
+  if (area_id) body.area_id = area_id;
   if (email) body.email = email;
   if (telefono) body.telefono = telefono;
+  if (departamento) body.departamento = departamento;
 
   const { data, error } = await supabaseClient
     .from('usuarios')
     .insert(body)
-    .select()
+    .select('*, areas(nombre)')
     .single();
   if (error) throw error;
   return data;
 }
 
-async function updateUsuario(id, nombre, area_id, email = null, telefono = null) {
+async function updateUsuario(id, nombre, area_id = null, email = null, telefono = null, departamento = null) {
   if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
-  const body = { nombre, area_id };
+  const body = { nombre };
+  if (area_id !== undefined) body.area_id = area_id;
   if (email !== null) body.email = email;
   if (telefono !== null) body.telefono = telefono;
+  if (departamento !== null) body.departamento = departamento;
 
   const { data, error } = await supabaseClient
     .from('usuarios')
     .update(body)
     .eq('id', id)
-    .select()
+    .select('*, areas(nombre)')
     .single();
   if (error) throw error;
   return data;
@@ -208,36 +226,74 @@ async function deleteUsuario(id) {
 }
 
 // ============================================
-// TICKETS CRUD
+// TICKETS CRUD & ASIGNACIÓN
 // ============================================
 
 async function fetchTickets() {
   if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const { data, error } = await supabaseClient
     .from('tickets')
-    .select('*, usuarios(nombre, areas(nombre))')
+    .select(`
+      *,
+      usuarios (
+        id,
+        nombre,
+        email,
+        telefono,
+        departamento,
+        areas (id, nombre)
+      ),
+      asignado:perfiles!tickets_asignado_a_fkey (
+        id,
+        email,
+        nombre_completo,
+        rol
+      )
+    `)
     .order('fecha', { ascending: false })
     .order('created_at', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    // Si falla el join específico con asignado, reintentar con consulta base
+    console.warn('Consulta con join extendido falló, reintentando consulta estándar:', error.message);
+    const fallback = await supabaseClient
+      .from('tickets')
+      .select('*, usuarios(*, areas(*))')
+      .order('fecha', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (fallback.error) throw fallback.error;
+    return fallback.data || [];
+  }
   return data || [];
 }
 
-async function createTicket({ usuario_id, problema, dx, solucion, fecha, status, prioridad = 'media' }) {
+async function createTicket({ usuario_id, problema, dx, solucion, fecha, status, prioridad = 'media', asignado_a = null, solicitante_perfil_id = null }) {
   if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
   const body = {
     usuario_id,
     problema,
     fecha: fecha || new Date().toISOString().split('T')[0],
-    prioridad
+    prioridad: prioridad || 'media',
+    status: status || 'abierto'
   };
   if (dx) body.dx = dx;
   if (solucion) body.solucion = solucion;
-  if (status) body.status = status;
+  if (asignado_a) body.asignado_a = asignado_a;
+  if (solicitante_perfil_id) body.solicitante_perfil_id = solicitante_perfil_id;
 
   const { data, error } = await supabaseClient
     .from('tickets')
     .insert(body)
-    .select()
+    .select(`
+      *,
+      usuarios (
+        id,
+        nombre,
+        email,
+        telefono,
+        departamento,
+        areas (id, nombre)
+      )
+    `)
     .single();
   if (error) throw error;
   return data;
@@ -249,10 +305,29 @@ async function updateTicket(id, updates) {
     .from('tickets')
     .update(updates)
     .eq('id', id)
-    .select()
+    .select(`
+      *,
+      usuarios (
+        id,
+        nombre,
+        email,
+        telefono,
+        departamento,
+        areas (id, nombre)
+      )
+    `)
     .single();
   if (error) throw error;
   return data;
+}
+
+async function assignTicket(ticketId, tecnicoId) {
+  if (!supabaseClient) throw new Error('Cliente Supabase no inicializado');
+  const updates = {
+    asignado_a: tecnicoId || null,
+    status: tecnicoId ? 'asignado' : 'abierto'
+  };
+  return await updateTicket(ticketId, updates);
 }
 
 async function deleteTicket(id) {
@@ -270,16 +345,18 @@ async function deleteTicket(id) {
 
 async function fetchCategorias() {
   if (!supabaseClient) return [];
-  const { data, error } = await supabaseClient
-    .from('categorias')
-    .select('*')
-    .eq('activo', true)
-    .order('nombre', { ascending: true });
-  if (error) {
-    console.warn('Categorías no disponibles:', error.message);
+  try {
+    const { data, error } = await supabaseClient
+      .from('categorias')
+      .select('*')
+      .eq('activo', true)
+      .order('nombre', { ascending: true });
+    if (error) throw error;
+    return data || [];
+  } catch (err) {
+    console.warn('Categorías no disponibles:', err.message);
     return [];
   }
-  return data || [];
 }
 
 // ============================================
@@ -294,6 +371,7 @@ if (typeof window !== 'undefined') {
   window.getProfile = getProfile;
   window.onAuthStateChange = onAuthStateChange;
   window.fetchPerfiles = fetchPerfiles;
+  window.fetchTecnicos = fetchTecnicos;
   window.updatePerfil = updatePerfil;
   window.fetchAreas = fetchAreas;
   window.createArea = createArea;
@@ -306,6 +384,7 @@ if (typeof window !== 'undefined') {
   window.fetchTickets = fetchTickets;
   window.createTicket = createTicket;
   window.updateTicket = updateTicket;
+  window.assignTicket = assignTicket;
   window.deleteTicket = deleteTicket;
   window.fetchCategorias = fetchCategorias;
 }
